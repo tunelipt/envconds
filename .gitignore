@@ -24,3 +24,10 @@ fp-info-cache
 # Exported BOM files
 *.xml
 *.csv
+
+# Python stuff
+__pycache__/*
+*.pyc
+*.spec
+dist/*
+build/*
