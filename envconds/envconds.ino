@@ -69,7 +69,7 @@ void setup_temp(){
 void setup()   /****** SETUP: RUNS ONCE ******/
 {
   // start serial port to show results
-  Serial.begin(115200);
+  Serial.begin(9600);
   
   setup_bmp(0x76);
   setup_temp();

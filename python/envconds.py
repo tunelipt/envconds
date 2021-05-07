@@ -9,7 +9,7 @@ from xmlrpc.server import SimpleXMLRPCServer
 
 class EnvConds(object):
 
-    def __init__(self, comport='/dev/ttyUSB0', baud=115200, timeout=2):
+    def __init__(self, comport='/dev/ttyUSB0', baud=9600, timeout=2):
 
         self.dev = serial.Serial(comport, baud, timeout=timeout);
     def open(self):
@@ -19,6 +19,10 @@ class EnvConds(object):
         self.dev.flushInput()
         self.dev.flushOutput()
         time.sleep(0.1)
+    def close(self):
+        self.flush()
+        self.dev.close()
+        
     def flush(self):
         self.dev.flushInput()
         self.dev.flushOutput()
