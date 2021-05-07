@@ -30,7 +30,8 @@ class EnvConds(object):
         time.sleep(0.1)
         s = self.dev.readline()
         time.sleep(0.1)
-        return (s)
+        return float(s)
+    
     def presstemp(self):
         cmd = b'*PT'
         self.dev.write(cmd)
@@ -38,7 +39,8 @@ class EnvConds(object):
         time.sleep(0.1)
         s = self.dev.readline()
         time.sleep(0.1)
-        return (s)
+        return float(s)
+    
     def humidity(self):
         cmd = b'*HH'
         self.dev.write(cmd)
@@ -46,14 +48,16 @@ class EnvConds(object):
         time.sleep(0.1)
         s = self.dev.readline()
         time.sleep(0.1)
-        return (s)
+        return float(s)
+    
     def humtemp(self):
         cmd = b'*HT'
         self.dev.write(cmd)
         self.dev.flushOutput()
         time.sleep(0.1)
         s = self.dev.readline()
-        return (s)
+        return float(s)
+    
     def temp(self, i=1):
         if (i < 1 or i > 5):
             error("Only temperature sensors 1-5 are available")
@@ -65,7 +69,7 @@ class EnvConds(object):
         time.sleep(0.1)
         s = self.dev.readline()
         time.sleep(0.1)
-        return (s)
+        return float(s)
 
     def clear(self):
         cmd = b'%'
