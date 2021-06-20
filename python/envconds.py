@@ -93,8 +93,8 @@ class EnvConds(object):
     
 
 
-def start_server(ip='localhost', port=9541, comport='/dev/ttyUSB0', baud=115200):
-    dev = ESPDaq(comport, baud)
+def start_server(ip='localhost', port=9539, comport='/dev/ttyUSB0', baud=9600):
+    dev = EnvConds(comport, baud)
     print("Starting XML-RPC server")
     print("IP: {}, port: {}".format(ip, port))
     server = SimpleXMLRPCServer((ip, port), allow_none=True)
@@ -104,9 +104,9 @@ def start_server(ip='localhost', port=9541, comport='/dev/ttyUSB0', baud=115200)
 
 if __name__ == "__main__":
     print("Creating interface ...")
-    parser = argparse.ArgumentParser(description="ESPDaq server")
+    parser = argparse.ArgumentParser(description="EnvConds XML-RPC server")
     parser.add_argument("-i", "--ip", help="IP address of the XML-RPC server", default="localhost")
-    parser.add_argument("-p", "--port", help="XML-RPC server port", default=9541, type=int)
+    parser.add_argument("-p", "--port", help="XML-RPC server port", default=9539, type=int)
     parser.add_argument("-s", "--comport", help="Serial port to be used", default="/dev/ttyUSB0")
 
     args = parser.parse_args()
