@@ -3,15 +3,146 @@
 import serial
 import time
 import argparse
+import threading
 
 from xmlrpc.server import SimpleXMLRPCServer
 
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
+class EnvDaqThread(threading.Thread):
+    def __init__(self, dev):
+        threading.Thread.__init__(self)
+        self.dev = dev
+        return
+    def run(self):
+        self.dev.acquire()
+    
+    
 class EnvConds(object):
 
-    def __init__(self, comport='/dev/ttyUSB0', baud=9600, timeout=2):
-
+    def __init__(self, comport='/dev/ttyUSB0', baud=9600, timeout=5):
+        self.availablechans = ['P', 'PT', 'H', 'HT', 'T1',
+                               'T2', 'T3', 'T4', 'T5']
+        self.daqchans = ['P', 'H', 'T1', 'T2', 'T3', 'T4']
+        self.acquiring = False
+        self.tinit = 0
+        self.ttotal = 1
+        self.nsamples = 0
+        self.stopaq = False
+        self.frames = []
+        self.rate = 0.0
+        self.thrd = None
+        
         self.dev = serial.Serial(comport, baud, timeout=timeout);
+        return
+    def daqtime(self, val=None):
+        if self.acquiring:
+            raise RuntimeError("Can't do this while acquiring data!")
+        if val is None:
+            return self.ttotal
+        else:
+            val = float(val)
+            if val < 0 or val > 300:
+                raise RuntimeError("daqtime should be a positive time interval in seconds, less than 300!")
+                
+            self.ttotal = val
+            return None
+        
+    def acquirechan(self, chan='P'):
+        if chan=='P':
+            return self.press()
+        elif chan=='PT':
+            return self.presstemp()
+        elif chan=='H':
+            return self.humidity()
+        elif chan=='HT':
+            return self.humtemp()
+        elif chan=='T1':
+            return self.temp(1)
+        elif chan=='T2':
+            return self.temp(2)
+        elif chan=='T3':
+            return self.temp(3)
+        elif chan=='T4':
+            return self.temp(4)
+        elif chan=='T5':
+            return self.temp(5)
+        else:
+            error('Channel {} does not exist!'.format(chan))
+            
+    def acquiresample(self):
+        values = [time.monotonic()]
+        for chan in self.daqchans:
+            values.append(self.acquirechan(chan))
+        return values
+    def scan(self, ttotal=None):
+        if self.acquiring:
+            raise RuntimeError("Can't do this while acquiring data!")
+        if ttotal is not None:
+            ttotal = float(ttotal)
+            if ttotal < 0 or ttotal > 300:
+                ttotal = self.ttotal
+        else:
+            ttotal = self.ttotal
+        
+        self.frames = []
+        self.stopaq = False
+        self.acquiring = True
+        self.nsamples = 0
+        
+        t1 = time.monotonic()
+        self.tinit = t1
+        tend = t1 + ttotal
+        n = 0
+        while True:
+            self.frames.append(self.acquiresample())
+            n = n + 1
+            self.nsamples = n
+            t2 = time.monotonic()
+            if t2 > tend or self.stopaq:
+                break
+        # Measure the sampling frequency
+        rate = n / (t2-t1)
+        self.acquiring = False
+        self.rate = rate
+
+    def acquire(self):
+
+        self.scan()
+        return self.frames, self.rate
+    
+    def start(self):
+        if self.acquiring:
+            raise RuntimeError("Illegal operation: System is already acquiring!")
+        self.thrd = EnvDaqThread(self)
+        self.thrd.start()
+        self.acquiring = True
+    def read(self):
+        if self.thrd is not None:
+            self.thrd.join()
+            self.thrd = None
+        
+        return self.frames, self.rate
+    def channels(self):
+        return self.daqchans
+    def availablechannels(self):
+        return self.availablechans
+    
+    
+    def stop(self):
+        if self.acquiring:
+            self.stopaq = True
+        return
+    def isacquiring(self):
+        return self.acquiring
+    def samplesread(self):
+        return self.nsamples
+    
     def open(self):
         if self.dev.is_open:
             self.dev.close()
@@ -26,41 +157,30 @@ class EnvConds(object):
     def flush(self):
         self.dev.flushInput()
         self.dev.flushOutput()
-        
+
+    def command(self, cmd, ntries=3):
+        for i in range(ntries):
+            self.dev.write(cmd)
+            self.dev.flushOutput()
+            s = self.dev.readline()
+            try:
+                val = float(s)
+                return val
+            except ValueError:
+                time.sleep(0.2)
+        return -9999.9
+
     def press(self):
-        cmd = b'*PP'
-        self.dev.write(cmd)
-        self.dev.flushOutput()
-        time.sleep(0.1)
-        s = self.dev.readline()
-        time.sleep(0.1)
-        return float(s)
+        return self.command(b'*PP')
     
     def presstemp(self):
-        cmd = b'*PT'
-        self.dev.write(cmd)
-        self.dev.flushOutput()
-        time.sleep(0.1)
-        s = self.dev.readline()
-        time.sleep(0.1)
-        return float(s)
+        return self.command(b'*PT')
     
     def humidity(self):
-        cmd = b'*HH'
-        self.dev.write(cmd)
-        self.dev.flushOutput()
-        time.sleep(0.1)
-        s = self.dev.readline()
-        time.sleep(0.1)
-        return float(s)
+        return self.command(b'*HH')
     
     def humtemp(self):
-        cmd = b'*HT'
-        self.dev.write(cmd)
-        self.dev.flushOutput()
-        time.sleep(0.1)
-        s = self.dev.readline()
-        return float(s)
+        return self.command(b'*HT')
     
     def temp(self, i=1):
         if (i < 1 or i > 5):
@@ -68,12 +188,7 @@ class EnvConds(object):
             return
         i = int(i)
         cmd = "*T{}".format(i).encode('ascii')
-        self.dev.write(cmd)
-        self.dev.flushOutput()
-        time.sleep(0.1)
-        s = self.dev.readline()
-        time.sleep(0.1)
-        return float(s)
+        return self.command(cmd)
 
     def clear(self):
         cmd = b'%'
@@ -86,9 +201,7 @@ class EnvConds(object):
         cmd = b'*S1'
         self.dev.write(cmd)
         self.dev.flushOutput()
-        time.sleep(0.1)
         s = self.dev.readline()
-        time.sleep(0.1)
         return s
     
 
