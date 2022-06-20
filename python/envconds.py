@@ -20,7 +20,7 @@ class EnvDaqThread(threading.Thread):
         self.dev = dev
         return
     def run(self):
-        self.dev.acquire()
+        self.dev.scan()
     
     
 class EnvConds(object):
@@ -52,7 +52,17 @@ class EnvConds(object):
                 
             self.ttotal = val
             return None
-        
+    def addinput(self, chans):
+        new_chans = []
+        for ch in chans:
+            if ch in self.availablechans:
+                new_chans.append(ch)
+            else:
+                raise ValueError("Channel {} is not available!".format(ch))
+        if new_chans:  # It is not empty!
+            self.chans = new_chans
+            
+    
     def acquirechan(self, chan='P'):
         if chan=='P':
             return self.press()
